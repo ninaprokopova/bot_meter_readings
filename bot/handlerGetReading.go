@@ -10,7 +10,6 @@ import (
 )
 
 func (b *Bot) startMeterReadingFlow(chatID, userID int64) {
-	// Сохраняем состояние пользователя
 	b.userStates[userID] = &UserState{
 		CurrentStep: "cold_water",
 	}
@@ -65,14 +64,12 @@ func (b *Bot) handleDayElectricityInput(state *UserState, value int, msg *tgbota
 func (b *Bot) handleNightElectricityInput(ctx context.Context, state *UserState, value int, msg *tgbotapi.Message) error {
 	state.Readings.ElectricityNight = value
 
-	// Сохраняем показания
 	if err := b.saveReadings(ctx, msg, state); err != nil {
 		b.sendTextReply(msg.Chat.ID, "Ошибка сохранения показаний")
 		delete(b.userStates, msg.From.ID)
 		return nil
 	}
 
-	// Формируем отчет
 	report := b.getReport(state)
 	b.sendTextReply(msg.Chat.ID, report)
 	delete(b.userStates, msg.From.ID)

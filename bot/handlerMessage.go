@@ -10,7 +10,6 @@ import (
 // Обработка сообщений (показаний) и сообщений-команд, начинающихся с /
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
 	if !msg.IsCommand() {
-		// Обработка ввода показаний
 		if state, ok := b.userStates[msg.From.ID]; ok {
 			b.handleMeterReadingInput(ctx, msg, state)
 			return

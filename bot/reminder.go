@@ -9,18 +9,18 @@ import (
 )
 
 func (b *Bot) startReminder() {
-	// Первая проверка при запуске
-	b.checkAndSendReminders(context.Background())
 
-	ticker := time.NewTicker(1 * time.Minute) // Проверка каждую минуту
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	var lastResetMonth time.Month
 
+	var wasRemindToday = false
+
 	for now := range ticker.C {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 
-		// Сброс статусов 1-го числа в 00:00
+		// вот это будто можно в отдельную функцию вынести
 		if now.Day() == 1 && now.Hour() == 0 && now.Minute() == 0 && now.Month() != lastResetMonth {
 			if err := b.userRepo.ResetSubmissionStatus(ctx); err != nil {
 				log.Printf("Reset status error: %v", err)
@@ -30,38 +30,49 @@ func (b *Bot) startReminder() {
 			}
 		}
 
-		// Отправка напоминаний в 12:00 с 20 по 25 число
-		if now.Day() >= 20 && now.Day() <= 24 && now.Hour() == 12 && now.Minute() == 00 {
-			b.checkAndSendReminders(ctx)
+		firstDay := 20
+		lastDay := 25
+		startHour := 12
+		lastHour := 20
+
+		if now.Hour() < startHour && now.Hour() > lastHour {
+			wasRemindToday = false
+		}
+		isTimeToSendReminders := now.Day() >= firstDay && now.Day() <= lastDay && now.Hour() >= startHour && now.Hour() <= lastHour
+
+		if isTimeToSendReminders && !wasRemindToday {
+			b.checkAndSendReminders(ctx, sendReminder)
+			wasRemindToday = true
 		}
 
 		cancel()
 	}
 }
 
-func (b *Bot) checkAndSendReminders(ctx context.Context) {
-	users, err := b.userRepo.GetSubscribedUsers(ctx)
+func (b *Bot) checkAndSendReminders(ctx context.Context, sendReminder func(int64, *Bot)) {
+	users, err := b.userRepo.GetShouldNotifyUsers(ctx)
+
 	if err != nil {
 		log.Printf("Get subscribed users error: %v", err)
 		return
 	}
 
 	for _, userID := range users {
-		shouldNotify, err := b.userRepo.ShouldNotify(ctx, userID)
-		if err != nil {
-			log.Printf("Check notification status error for user %d: %v", userID, err)
-			continue
-		}
-
-		if !shouldNotify {
-			continue
-		}
-
-		b.sendReminder(userID)
+		sendReminder(userID, b)
 	}
 }
 
-func (b *Bot) sendReminder(userID int64) {
+func sendReminder(userID int64, b *Bot) {
+	msg := getRemindMessage(userID)
+
+	if _, err := b.api.Send(msg); err != nil {
+		log.Printf("Send reminder error to %d: %v", userID, err)
+	} else {
+		log.Printf("Reminder sent to %d", userID)
+	}
+}
+
+func getRemindMessage(userID int64) tgbotapi.MessageConfig {
 	msg := tgbotapi.NewMessage(userID, "⏰ Пора передать показания счетчиков!")
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
@@ -70,10 +81,5 @@ func (b *Bot) sendReminder(userID int64) {
 			tgbotapi.NewInlineKeyboardButtonData("🔕 Отписаться", "unsubscribe"),
 		),
 	)
-
-	if _, err := b.api.Send(msg); err != nil {
-		log.Printf("Send reminder error to %d: %v", userID, err)
-	} else {
-		log.Printf("Reminder sent to %d", userID)
-	}
+	return msg
 }

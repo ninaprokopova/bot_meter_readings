@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"submit_meter_readings/bot"
 	"submit_meter_readings/config"
@@ -24,6 +25,7 @@ func main() {
 		log.Fatal("Bot init error:", err)
 	}
 
+	fmt.Println("start")
 	bot.Start()
 
 	select {}

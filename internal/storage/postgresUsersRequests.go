@@ -66,12 +66,13 @@ func (s *PostgresStorage) ResetSubmissionStatus(ctx context.Context) error {
 	return err
 }
 
-func (s *PostgresStorage) GetSubscribedUsers(ctx context.Context) ([]int64, error) {
+func (s *PostgresStorage) GetShouldNotifyUsers(ctx context.Context) ([]int64, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT user_id
 		FROM users
-		WHERE is_subscribed = TRUE
+		WHERE is_subscribed = true AND has_submitted = false
 	`)
+
 	if err != nil {
 		return nil, err
 	}

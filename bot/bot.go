@@ -9,8 +9,8 @@ import (
 
 type Bot struct {
 	api        *tgbotapi.BotAPI
-	userRepo   storage.UserRepository // Используем интерфейс
-	userStates map[int64]*UserState   // Текущие состояния пользователей
+	userRepo   storage.UserRepository
+	userStates map[int64]*UserState
 }
 
 func NewBot(cfg *config.Config, repo storage.UserRepository) (*Bot, error) {
