@@ -46,32 +46,32 @@ func (m *MockUserRepo) SaveMeterReadings(ctx context.Context, userID int64,
 	return args.Error(0)
 }
 
+type MockMessageSender struct {
+	mock.Mock
+}
+
+func (m *MockMessageSender) SendMessage(msg tgbotapi.MessageConfig) {
+	m.Called(msg)
+}
+
 func TestCheckAndSendReminders_Success(t *testing.T) {
 	ctx := context.Background()
 
 	userRepo := new(MockUserRepo)
 	userRepo.On("GetShouldNotifyUsers", ctx).Return([]int64{1, 2}, nil)
 
+	mockSender := new(MockMessageSender)
+	mockSender.On("SendMessage", mock.AnythingOfType("tgbotapi.MessageConfig")).Twice()
+
 	bot := &Bot{
 		userRepo: userRepo,
+		sender:   mockSender,
 	}
 
-	var calledWith []int64
-	mockSendReminder := func(userID int64, bot *Bot) {
-		calledWith = append(calledWith, userID)
-	}
-
-	bot.checkAndSendReminders(ctx, mockSendReminder)
-
-	if len(calledWith) != 2 {
-		t.Errorf("Expected SendReminder calls 2 times, got %v", len(calledWith))
-	}
-
-	if calledWith[0] != 1 || calledWith[1] != 2 {
-		t.Errorf("Expected sendReminder to be called with userIDs 1 and 2, got %v", calledWith)
-	}
+	bot.checkAndSendReminders(ctx)
 
 	userRepo.AssertExpectations(t)
+	mockSender.AssertExpectations(t)
 }
 
 func TestCheckAndSendReminders_DBError(t *testing.T) {
@@ -81,22 +81,13 @@ func TestCheckAndSendReminders_DBError(t *testing.T) {
 	expectedErr := errors.New("database error")
 	userRepo.On("GetShouldNotifyUsers", ctx).Return([]int64{1, 2}, expectedErr)
 
-	var calledWith []int64
-	mockSendReminder := func(userID int64, bot *Bot) {
-		calledWith = append(calledWith, userID)
-	}
-
 	bot := &Bot{
 		userRepo: userRepo,
 	}
 
-	bot.checkAndSendReminders(ctx, mockSendReminder)
+	bot.checkAndSendReminders(ctx)
 
 	userRepo.AssertExpectations(t)
-
-	if len(calledWith) != 0 {
-		t.Errorf("Expected SendReminder calls 0 times, got %v", len(calledWith))
-	}
 }
 
 func TestGetRemainMessage(t *testing.T) {

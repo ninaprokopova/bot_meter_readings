@@ -15,65 +15,63 @@ func (b *Bot) startMeterReadingFlow(chatID, userID int64) {
 	}
 
 	msg := tgbotapi.NewMessage(chatID, "Введите показание счетчика холодной воды (целое число):")
-	b.api.Send(msg)
+	b.sender.SendMessage(msg)
 }
 
-func (b *Bot) handleMeterReadingInput(ctx context.Context, msg *tgbotapi.Message, state *UserState) error {
+func (b *Bot) handleMeterReadingInput(ctx context.Context, msg *tgbotapi.Message, state *UserState) {
 	value, err := strconv.Atoi(msg.Text)
 	if err != nil {
-		return b.sendTextReply(msg.Chat.ID, "Пожалуйста, введите целое число")
+		msgWriteInteger := tgbotapi.NewMessage(msg.Chat.ID, "Пожалуйста, введите целое число")
+		b.sender.SendMessage(msgWriteInteger)
 	}
 
 	switch state.CurrentStep {
 	case "cold_water":
-		return b.handleColdWaterInput(state, value, msg)
+		b.handleColdWaterInput(state, value, msg)
 	case "hot_water":
-		return b.handleHotWaterInput(state, value, msg)
+		b.handleHotWaterInput(state, value, msg)
 	case "electricity_day":
-		return b.handleDayElectricityInput(state, value, msg)
+		b.handleDayElectricityInput(state, value, msg)
 	case "electricity_night":
-		return b.handleNightElectricityInput(ctx, state, value, msg)
+		b.handleNightElectricityInput(ctx, state, value, msg)
 	}
-
-	return nil
 }
 
-func (b *Bot) sendTextReply(chatID int64, text string) error {
-	_, err := b.api.Send(tgbotapi.NewMessage(chatID, text))
-	return err
-}
-
-func (b *Bot) handleColdWaterInput(state *UserState, value int, msg *tgbotapi.Message) error {
+func (b *Bot) handleColdWaterInput(state *UserState, value int, msg *tgbotapi.Message) {
 	state.Readings.ColdWater = value
 	state.CurrentStep = "hot_water"
-	return b.sendTextReply(msg.Chat.ID, "Введите показание счетчика горячей воды:")
+	msgHotWater := tgbotapi.NewMessage(msg.Chat.ID, "Введите показание счетчика горячей воды:")
+	b.sender.SendMessage(msgHotWater)
 }
 
-func (b *Bot) handleHotWaterInput(state *UserState, value int, msg *tgbotapi.Message) error {
+func (b *Bot) handleHotWaterInput(state *UserState, value int, msg *tgbotapi.Message) {
 	state.Readings.HotWater = value
 	state.CurrentStep = "electricity_day"
-	return b.sendTextReply(msg.Chat.ID, "Введите показание счетчика дневного тарифа:")
+	msgDayElectricity := tgbotapi.NewMessage(msg.Chat.ID, "Введите показание счетчика дневного тарифа:")
+	b.sender.SendMessage(msgDayElectricity)
 }
 
-func (b *Bot) handleDayElectricityInput(state *UserState, value int, msg *tgbotapi.Message) error {
+func (b *Bot) handleDayElectricityInput(state *UserState, value int, msg *tgbotapi.Message) {
 	state.Readings.ElectricityDay = value
 	state.CurrentStep = "electricity_night"
-	return b.sendTextReply(msg.Chat.ID, "Введите показание счетчика ночного тарифа:")
+	msgNightElecticity := tgbotapi.NewMessage(msg.Chat.ID, "Введите показание счетчика ночного тарифа:")
+	b.sender.SendMessage(msgNightElecticity)
 }
 
-func (b *Bot) handleNightElectricityInput(ctx context.Context, state *UserState, value int, msg *tgbotapi.Message) error {
+func (b *Bot) handleNightElectricityInput(ctx context.Context, state *UserState, value int, msg *tgbotapi.Message) {
 	state.Readings.ElectricityNight = value
 
-	if err := b.saveReadings(ctx, msg, state); err != nil {
-		b.sendTextReply(msg.Chat.ID, "Ошибка сохранения показаний")
+	err := b.saveReadings(ctx, msg, state)
+	if err != nil {
+		msgSaveError := tgbotapi.NewMessage(msg.Chat.ID, "Ошибка сохранения показаний")
+		b.sender.SendMessage(msgSaveError)
 		delete(b.userStates, msg.From.ID)
-		return nil
 	}
 
 	report := b.getReport(state)
-	b.sendTextReply(msg.Chat.ID, report)
+	msgReport := tgbotapi.NewMessage(msg.Chat.ID, report)
+	b.sender.SendMessage(msgReport)
 	delete(b.userStates, msg.From.ID)
-	return nil
 }
 
 func (b *Bot) saveReadings(ctx context.Context, msg *tgbotapi.Message, state *UserState) error {

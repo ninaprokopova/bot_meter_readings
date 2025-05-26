@@ -61,7 +61,6 @@ func (s *PostgresStorage) ResetSubmissionStatus(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE users
 		SET has_submitted = FALSE
-		WHERE is_subscribed = TRUE
 	`)
 	return err
 }
