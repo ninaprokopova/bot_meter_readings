@@ -9,10 +9,13 @@ import (
 
 func (b *Bot) handleUnsubscribe(ctx context.Context, userID int64, chatID int64, query *tgbotapi.CallbackQuery) {
 	if err := b.userRepo.Unsubscribe(ctx, userID); err != nil {
-		log.Printf("Unsubscribe error: %v", err)
-		b.sendReply(chatID, "❌ Ошибка отписки.")
+		log.Printf("Ошибка при попытке отписаться от бота: %v", err)
+		msgSaveError := tgbotapi.NewMessage(chatID, "❌ Ошибка отписки. Попробуйте позже.")
+		b.sender.SendMessage(msgSaveError)
 		return
 	}
-	b.sendReply(chatID, "🔕 Вы отписались от напоминаний.")
-	b.api.Send(tgbotapi.NewDeleteMessage(chatID, query.Message.MessageID))
+	msgSubmit := tgbotapi.NewMessage(chatID, "🔕 Вы отписались от напоминаний.")
+	msgForDelete := tgbotapi.NewDeleteMessage(chatID, query.Message.MessageID)
+	b.sender.SendMessage(msgSubmit)
+	b.deleter.DeleteMessage(msgForDelete)
 }

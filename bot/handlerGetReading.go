@@ -9,13 +9,15 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
-func (b *Bot) startMeterReadingFlow(chatID, userID int64) {
+func (b *Bot) startMeterReadingFlow(chatID, userID, msgID int64) {
 	b.userStates[userID] = &UserState{
 		CurrentStep: "cold_water",
 	}
 
 	msg := tgbotapi.NewMessage(chatID, "Введите показание счетчика холодной воды (целое число):")
 	b.sender.SendMessage(msg)
+	msgForDelete := tgbotapi.NewDeleteMessage(chatID, int(msgID))
+	b.deleter.DeleteMessage(msgForDelete)
 }
 
 func (b *Bot) handleMeterReadingInput(ctx context.Context, msg *tgbotapi.Message, state *UserState) {

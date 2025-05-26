@@ -17,6 +17,6 @@ func (b *Bot) handleCallback(ctx context.Context, query *tgbotapi.CallbackQuery)
 	case "unsubscribe":
 		b.handleUnsubscribe(ctx, userID, chatID, query)
 	case "generate_readings":
-		b.startMeterReadingFlow(chatID, userID)
+		b.startMeterReadingFlow(chatID, userID, int64(query.Message.MessageID))
 	}
 }

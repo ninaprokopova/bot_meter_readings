@@ -8,11 +8,15 @@ import (
 )
 
 func (b *Bot) handleSubmitted(ctx context.Context, userID int64, chatID int64, query *tgbotapi.CallbackQuery) {
-	if err := b.userRepo.MarkAsSubmitted(ctx, userID); err != nil {
+	err := b.userRepo.MarkAsSubmitted(ctx, userID)
+	if err != nil {
 		log.Printf("Mark as submitted error: %v", err)
-		b.sendReply(chatID, "❌ Ошибка сохранения. Попробуйте позже.")
+		msgSaveError := tgbotapi.NewMessage(chatID, "❌ Ошибка сохранения. Попробуйте позже.")
+		b.sender.SendMessage(msgSaveError)
 		return
 	}
-	b.sendReply(chatID, "✅ Спасибо! Показания учтены.")
-	b.api.Send(tgbotapi.NewDeleteMessage(chatID, query.Message.MessageID))
+	msgSubmit := tgbotapi.NewMessage(chatID, "✅ Вы передали показания. До следующего месяца")
+	b.sender.SendMessage(msgSubmit)
+	msgForDelete := tgbotapi.NewDeleteMessage(chatID, query.Message.MessageID)
+	b.deleter.DeleteMessage(msgForDelete)
 }
