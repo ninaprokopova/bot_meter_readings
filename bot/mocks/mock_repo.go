@@ -39,6 +39,6 @@ func (m *MockUserRepo) ResetSubmissionStatus(ctx context.Context) error {
 }
 func (m *MockUserRepo) SaveMeterReadings(ctx context.Context, userID int64,
 	coldWater, hotWater, electricityDay, electricityNight int) error {
-	args := m.Called(ctx)
+	args := m.Called(ctx, userID, coldWater, hotWater, electricityDay, electricityNight)
 	return args.Error(0)
 }

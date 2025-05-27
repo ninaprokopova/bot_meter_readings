@@ -39,6 +39,7 @@ func (b *Bot) handleMeterReadingInput(ctx context.Context, msg *tgbotapi.Message
 	}
 }
 
+// Можно на самом деле просто чиселкой chat.ID передавать, чтобы msg не протаскивать вниз
 func (b *Bot) handleColdWaterInput(state *UserState, value int, msg *tgbotapi.Message) {
 	state.Readings.ColdWater = value
 	state.CurrentStep = "hot_water"
@@ -68,6 +69,7 @@ func (b *Bot) handleNightElectricityInput(ctx context.Context, state *UserState,
 		msgSaveError := tgbotapi.NewMessage(msg.Chat.ID, "Ошибка сохранения показаний")
 		b.sender.SendMessage(msgSaveError)
 		delete(b.userStates, msg.From.ID)
+		return
 	}
 
 	report := b.getReport(state)
@@ -85,8 +87,10 @@ func (b *Bot) saveReadings(ctx context.Context, msg *tgbotapi.Message, state *Us
 	return err
 }
 
+var timeNow = time.Now
+
 func (*Bot) getReport(state *UserState) string {
-	now := time.Now()
+	now := timeNow()
 	monthName := getMonthName(now.Month())
 
 	report := fmt.Sprintf(
