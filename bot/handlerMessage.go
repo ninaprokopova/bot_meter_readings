@@ -9,44 +9,44 @@ import (
 
 // Обработка сообщений (показаний) и сообщений-команд, начинающихся с /
 func (b *Bot) handleMessage(ctx context.Context, msg *tgbotapi.Message) {
+	chatID := msg.Chat.ID
+	userID := msg.From.ID
 	if !msg.IsCommand() {
-		if state, ok := b.userStates[msg.From.ID]; ok {
+		state, ok := b.userStates[userID]
+		if ok {
 			b.handleMeterReadingInput(ctx, msg, state)
-			return
 		}
+		return
 	}
 
 	switch msg.Command() {
 	case "start":
-		b.handleStartCommand(ctx, msg)
+		b.handleStartCommand(ctx, chatID, userID)
 	case "status":
-		b.handleStatusCommand(ctx, msg)
+		b.handleStatusCommand(ctx, chatID, userID)
 	}
 }
 
-func (b *Bot) handleStartCommand(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
-
-	if err := b.userRepo.Subscribe(ctx, userID); err != nil {
+func (b *Bot) handleStartCommand(ctx context.Context, chatID, userID int64) {
+	err := b.userRepo.Subscribe(ctx, userID)
+	if err != nil {
 		log.Printf("Subscribe error: %v", err)
-		b.sendReply(msg.Chat.ID, "❌ Ошибка подписки. Попробуйте позже.")
+		msgError := tgbotapi.NewMessage(chatID, "❌ Ошибка подписки. Попробуйте позже.")
+		b.sender.SendMessage(msgError)
 		return
 	}
 
-	reply := tgbotapi.NewMessage(msg.Chat.ID, "✅ Вы подписались на напоминания!\nОни будут приходить в 12:00 с 20 по 25 число каждого месяца. ")
-
-	if _, err := b.api.Send(reply); err != nil {
-		log.Printf("Send message error: %v", err)
-	}
+	reply := tgbotapi.NewMessage(chatID, "✅ Вы подписались на напоминания!\nОни будут приходить c 12:00 по 15:00 с 20 по 25 число каждого месяца.")
+	b.sender.SendMessage(reply)
 }
 
-func (b *Bot) handleStatusCommand(ctx context.Context, msg *tgbotapi.Message) {
-	userID := msg.From.ID
+func (b *Bot) handleStatusCommand(ctx context.Context, chatID, userID int64) {
 
 	shouldNotify, err := b.userRepo.ShouldNotify(ctx, userID)
 	if err != nil {
 		log.Printf("Status check error: %v", err)
-		b.sendReply(msg.Chat.ID, "❌ Ошибка проверки статуса.")
+		msgError := tgbotapi.NewMessage(chatID, "❌ Ошибка проверки статуса.")
+		b.sender.SendMessage(msgError)
 		return
 	}
 
@@ -54,13 +54,6 @@ func (b *Bot) handleStatusCommand(ctx context.Context, msg *tgbotapi.Message) {
 	if !shouldNotify {
 		statusText = "✅ Вы уже передали показания в этом месяце"
 	}
-
-	b.sendReply(msg.Chat.ID, statusText)
-}
-
-func (b *Bot) sendReply(chatID int64, text string) {
-	msg := tgbotapi.NewMessage(chatID, text)
-	if _, err := b.api.Send(msg); err != nil {
-		log.Printf("Send reply error: %v", err)
-	}
+	msgStatus := tgbotapi.NewMessage(chatID, statusText)
+	b.sender.SendMessage(msgStatus)
 }

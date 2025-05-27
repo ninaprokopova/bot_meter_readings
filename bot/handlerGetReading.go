@@ -22,9 +22,10 @@ func (b *Bot) startMeterReadingFlow(chatID, userID, msgID int64) {
 
 func (b *Bot) handleMeterReadingInput(ctx context.Context, msg *tgbotapi.Message, state *UserState) {
 	value, err := strconv.Atoi(msg.Text)
-	if err != nil {
+	if err != nil || value < 0 {
 		msgWriteInteger := tgbotapi.NewMessage(msg.Chat.ID, "Пожалуйста, введите целое число")
 		b.sender.SendMessage(msgWriteInteger)
+		return
 	}
 
 	switch state.CurrentStep {

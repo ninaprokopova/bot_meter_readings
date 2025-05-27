@@ -9,6 +9,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestHandlerGetReading_GetMonthName(t *testing.T) {
@@ -315,4 +316,118 @@ func TestHandlerGetReadings_handleNightElectricityInputError(t *testing.T) {
 	mockSender.AssertExpectations(t)
 	mockRepo.AssertExpectations(t)
 	assert.NotContains(t, bot.userStates, testUserID, "User state should be deleted")
+}
+
+func TestBot_handleMeterReadingInput(t *testing.T) {
+	ctx := context.Background()
+	testChatID := int64(123)
+	testUserID := int64(456)
+
+	mockSender := new(mocks.MockMessageSender)
+	mockRepo := new(mocks.MockUserRepo)
+	bot := &Bot{
+		sender:   mockSender,
+		userRepo: mockRepo,
+	}
+
+	t.Run("invalid input (non-numeric)", func(t *testing.T) {
+		msg := &tgbotapi.Message{
+			Text: "not_a_number",
+			Chat: &tgbotapi.Chat{ID: testChatID},
+			From: &tgbotapi.User{ID: testUserID},
+		}
+		state := &UserState{CurrentStep: "cold_water"}
+
+		expectedMsg := tgbotapi.NewMessage(testChatID, "Пожалуйста, введите целое число")
+		mockSender.On("SendMessage", expectedMsg).Return(nil)
+
+		bot.handleMeterReadingInput(ctx, msg, state)
+
+		mockSender.AssertExpectations(t)
+	})
+
+	t.Run("invalid input (negative number)", func(t *testing.T) {
+		msg := &tgbotapi.Message{
+			Text: "-100",
+			Chat: &tgbotapi.Chat{ID: testChatID},
+			From: &tgbotapi.User{ID: testUserID},
+		}
+		state := &UserState{CurrentStep: "cold_water"}
+
+		expectedMsg := tgbotapi.NewMessage(testChatID, "Пожалуйста, введите целое число")
+		mockSender.On("SendMessage", expectedMsg).Return(nil)
+
+		bot.handleMeterReadingInput(ctx, msg, state)
+
+		mockSender.AssertExpectations(t)
+	})
+
+	t.Run("valid input - cold water", func(t *testing.T) {
+		msg := &tgbotapi.Message{
+			Text: "100",
+			Chat: &tgbotapi.Chat{ID: testChatID},
+			From: &tgbotapi.User{ID: testUserID},
+		}
+		state := &UserState{CurrentStep: "cold_water"}
+
+		mockSender.On("SendMessage", mock.Anything).Return(nil)
+
+		bot.handleMeterReadingInput(ctx, msg, state)
+
+		assert.Equal(t, 100, state.Readings.ColdWater)
+	})
+
+	t.Run("valid input - hot water", func(t *testing.T) {
+		msg := &tgbotapi.Message{
+			Text: "100",
+			Chat: &tgbotapi.Chat{ID: testChatID},
+			From: &tgbotapi.User{ID: testUserID},
+		}
+		state := &UserState{CurrentStep: "hot_water"}
+
+		mockSender.On("SendMessage", mock.Anything).Return(nil)
+
+		bot.handleMeterReadingInput(ctx, msg, state)
+
+		assert.Equal(t, 100, state.Readings.HotWater)
+	})
+
+	t.Run("valid input - electricity day", func(t *testing.T) {
+		msg := &tgbotapi.Message{
+			Text: "100",
+			Chat: &tgbotapi.Chat{ID: testChatID},
+			From: &tgbotapi.User{ID: testUserID},
+		}
+		state := &UserState{CurrentStep: "electricity_day"}
+
+		mockSender.On("SendMessage", mock.Anything).Return(nil)
+
+		bot.handleMeterReadingInput(ctx, msg, state)
+
+		assert.Equal(t, 100, state.Readings.ElectricityDay)
+	})
+
+	t.Run("valid input - night electricity", func(t *testing.T) {
+		msg := &tgbotapi.Message{
+			Text: "50",
+			Chat: &tgbotapi.Chat{ID: testChatID},
+			From: &tgbotapi.User{ID: testUserID},
+		}
+		state := &UserState{
+			CurrentStep: "electricity_night",
+			Readings: MeterReadings{
+				ColdWater:      100,
+				HotWater:       80,
+				ElectricityDay: 60,
+			},
+		}
+
+		mockRepo.On("SaveMeterReadings", ctx, testUserID, 100, 80, 60, 50).Return(nil)
+		mockSender.On("SendMessage", mock.Anything).Return(nil)
+
+		bot.handleMeterReadingInput(ctx, msg, state)
+
+		assert.Equal(t, 50, state.Readings.ElectricityNight)
+		mockRepo.AssertExpectations(t)
+	})
 }

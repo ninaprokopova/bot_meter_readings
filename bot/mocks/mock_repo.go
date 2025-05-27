@@ -16,7 +16,7 @@ func (m *MockUserRepo) GetShouldNotifyUsers(ctx context.Context) ([]int64, error
 }
 
 func (m *MockUserRepo) Subscribe(ctx context.Context, userID int64) error {
-	args := m.Called(ctx)
+	args := m.Called(ctx, userID)
 	return args.Error(0)
 }
 
@@ -30,7 +30,7 @@ func (m *MockUserRepo) MarkAsSubmitted(ctx context.Context, userID int64) error 
 	return args.Error(0)
 }
 func (m *MockUserRepo) ShouldNotify(ctx context.Context, userID int64) (bool, error) {
-	args := m.Called(ctx)
+	args := m.Called(ctx, userID)
 	return args.Get(0).(bool), args.Error(1)
 }
 func (m *MockUserRepo) ResetSubmissionStatus(ctx context.Context) error {
