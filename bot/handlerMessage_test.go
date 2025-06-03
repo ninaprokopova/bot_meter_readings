@@ -91,7 +91,7 @@ func TestHandleMessage_StartCommand_DBError(t *testing.T) {
 	sender.AssertExpectations(t)
 }
 
-func TestHandleMessage_StatusCommand_ShouldNotify(t *testing.T) {
+func TestHandleMessage_StatusCommand_SubscribeNotSubmitted(t *testing.T) {
 	ctx := context.Background()
 	userRepo := new(mocks.MockUserRepo)
 	sender := new(mocks.MockMessageSender)
@@ -108,7 +108,7 @@ func TestHandleMessage_StatusCommand_ShouldNotify(t *testing.T) {
 		Entities: []tgbotapi.MessageEntity{{Type: "bot_command", Offset: 0, Length: 7}},
 	}
 
-	userRepo.On("ShouldNotify", ctx, int64(456)).Return(true, nil)
+	userRepo.On("GetUserStatus", mock.Anything, int64(456)).Return(true, false, nil)
 
 	expectedMsg := tgbotapi.NewMessage(123, "🔔 Вы подписаны на напоминания")
 	sender.On("SendMessage", expectedMsg).Return()
@@ -119,7 +119,7 @@ func TestHandleMessage_StatusCommand_ShouldNotify(t *testing.T) {
 	sender.AssertExpectations(t)
 }
 
-func TestHandleMessage_StatusCommand_ShouldNotNotify(t *testing.T) {
+func TestHandleMessage_StatusCommand_SubscribeSubmitted(t *testing.T) {
 	ctx := context.Background()
 	userRepo := new(mocks.MockUserRepo)
 	sender := new(mocks.MockMessageSender)
@@ -136,9 +136,37 @@ func TestHandleMessage_StatusCommand_ShouldNotNotify(t *testing.T) {
 		Entities: []tgbotapi.MessageEntity{{Type: "bot_command", Offset: 0, Length: 7}},
 	}
 
-	userRepo.On("ShouldNotify", ctx, int64(456)).Return(false, nil)
+	userRepo.On("GetUserStatus", mock.Anything, int64(456)).Return(true, true, nil)
 
 	expectedMsg := tgbotapi.NewMessage(123, "✅ Вы уже передали показания в этом месяце")
+	sender.On("SendMessage", expectedMsg).Return()
+
+	bot.handleMessage(ctx, msg)
+
+	userRepo.AssertExpectations(t)
+	sender.AssertExpectations(t)
+}
+
+func TestHandleMessage_StatusCommand_NotSubscribe(t *testing.T) {
+	ctx := context.Background()
+	userRepo := new(mocks.MockUserRepo)
+	sender := new(mocks.MockMessageSender)
+
+	bot := &Bot{
+		userRepo: userRepo,
+		sender:   sender,
+	}
+
+	msg := &tgbotapi.Message{
+		Chat:     &tgbotapi.Chat{ID: 123},
+		From:     &tgbotapi.User{ID: 456},
+		Text:     "/status",
+		Entities: []tgbotapi.MessageEntity{{Type: "bot_command", Offset: 0, Length: 7}},
+	}
+
+	userRepo.On("GetUserStatus", mock.Anything, int64(456)).Return(false, false, nil)
+
+	expectedMsg := tgbotapi.NewMessage(123, "🔕 Вы не подписаны на напоминания")
 	sender.On("SendMessage", expectedMsg).Return()
 
 	bot.handleMessage(ctx, msg)
@@ -165,7 +193,7 @@ func TestHandleMessage_StatusCommand_DBError(t *testing.T) {
 	}
 
 	expectedErr := errors.New("database error")
-	userRepo.On("ShouldNotify", ctx, int64(456)).Return(true, expectedErr)
+	userRepo.On("GetUserStatus", ctx, int64(456)).Return(true, true, expectedErr)
 
 	expectedMsg := tgbotapi.NewMessage(123, "❌ Ошибка проверки статуса.")
 	sender.On("SendMessage", expectedMsg).Return()

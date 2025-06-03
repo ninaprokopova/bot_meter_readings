@@ -41,8 +41,7 @@ func (b *Bot) handleStartCommand(ctx context.Context, chatID, userID int64) {
 }
 
 func (b *Bot) handleStatusCommand(ctx context.Context, chatID, userID int64) {
-
-	shouldNotify, err := b.userRepo.ShouldNotify(ctx, userID)
+	isSubscribed, hasSubmitted, err := b.userRepo.GetUserStatus(ctx, userID)
 	if err != nil {
 		log.Printf("Status check error: %v", err)
 		msgError := tgbotapi.NewMessage(chatID, "❌ Ошибка проверки статуса.")
@@ -50,9 +49,15 @@ func (b *Bot) handleStatusCommand(ctx context.Context, chatID, userID int64) {
 		return
 	}
 
-	statusText := "🔔 Вы подписаны на напоминания"
-	if !shouldNotify {
-		statusText = "✅ Вы уже передали показания в этом месяце"
+	var statusText string
+	if !isSubscribed {
+		statusText = "🔕 Вы не подписаны на напоминания"
+	} else {
+		if hasSubmitted {
+			statusText = "✅ Вы уже передали показания в этом месяце"
+		} else {
+			statusText = "🔔 Вы подписаны на напоминания"
+		}
 	}
 	msgStatus := tgbotapi.NewMessage(chatID, statusText)
 	b.sender.SendMessage(msgStatus)

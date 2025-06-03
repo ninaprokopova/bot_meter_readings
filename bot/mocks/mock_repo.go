@@ -42,3 +42,8 @@ func (m *MockUserRepo) SaveMeterReadings(ctx context.Context, userID int64,
 	args := m.Called(ctx, userID, coldWater, hotWater, electricityDay, electricityNight)
 	return args.Error(0)
 }
+
+func (m *MockUserRepo) GetUserStatus(ctx context.Context, userID int64) (bool, bool, error) {
+	args := m.Called(ctx, userID)
+	return args.Get(0).(bool), args.Get(1).(bool), args.Error(2)
+}

@@ -35,26 +35,21 @@ func (s *PostgresStorage) MarkAsSubmitted(ctx context.Context, userID int64) err
 	return err
 }
 
-func (s *PostgresStorage) ShouldNotify(ctx context.Context, userID int64) (bool, error) {
-	var (
-		isSubscribed bool
-		hasSubmitted bool
-	)
-
-	err := s.db.QueryRowContext(ctx, `
+func (s *PostgresStorage) GetUserStatus(ctx context.Context, userID int64) (isSubscribed, hasSubmitted bool, err error) {
+	err = s.db.QueryRowContext(ctx, `
 		SELECT is_subscribed, has_submitted
 		FROM users
 		WHERE user_id = $1
 	`, userID).Scan(&isSubscribed, &hasSubmitted)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
+		return false, false, nil
 	}
 	if err != nil {
-		return false, err
+		return false, false, nil
 	}
 
-	return isSubscribed && !hasSubmitted, nil
+	return isSubscribed, hasSubmitted, nil
 }
 
 func (s *PostgresStorage) ResetSubmissionStatus(ctx context.Context) error {
