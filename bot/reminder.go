@@ -41,7 +41,12 @@ func (b *Bot) resetStatus(ctx context.Context, now time.Time, lastResetMonth tim
 }
 
 func (b *Bot) sendReminds(ctx context.Context, now time.Time, wasRemindToday bool) bool {
-	firstDay := 20
+	// firstDay := 20
+	// lastDay := 25
+	// startHour := 12
+	// lastHour := 15
+
+	firstDay := 6
 	lastDay := 25
 	startHour := 12
 	lastHour := 15

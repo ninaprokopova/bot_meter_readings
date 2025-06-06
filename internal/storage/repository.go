@@ -11,4 +11,6 @@ type UserRepository interface {
 		coldWater, hotWater, electricityDay, electricityNight int) error
 	GetShouldNotifyUsers(ctx context.Context) ([]int64, error)
 	GetUserStatus(ctx context.Context, userID int64) (bool, bool, error)
+	ChangeTemplate(ctx context.Context, userID uint64, newTempate string) error
+	GetTemplate(ctx context.Context, userID uint64) (string, error)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -73,7 +74,7 @@ func (b *Bot) handleNightElectricityInput(ctx context.Context, state *UserState,
 		return
 	}
 
-	report := b.getReport(state)
+	report := b.getReport(ctx, state, uint64(msg.From.ID))
 	msgReport := tgbotapi.NewMessage(msg.Chat.ID, report)
 	b.sender.SendMessage(msgReport)
 	delete(b.userStates, msg.From.ID)
@@ -90,23 +91,24 @@ func (b *Bot) saveReadings(ctx context.Context, msg *tgbotapi.Message, state *Us
 
 var timeNow = time.Now
 
-func (*Bot) getReport(state *UserState) string {
+func (b *Bot) getReport(ctx context.Context, state *UserState, userID uint64) string {
 	now := timeNow()
 	monthName := getMonthName(now.Month())
-
+	template, _ := b.userRepo.GetTemplate(ctx, userID)
 	report := fmt.Sprintf(
-		"Показания счетчиков %s %d:\n"+
+		"\nПоказания счетчиков %s %d:\n"+
 			"Холодная вода: %d\n"+
 			"Горячая вода: %d\n"+
 			"Электричество день (T1): %d\n"+
-			"Электричество ночь (T2): %d",
+			"Электричество ночь (T2): %d\n",
 		monthName,
 		now.Year(),
 		state.Readings.ColdWater,
 		state.Readings.HotWater,
 		state.Readings.ElectricityDay,
 		state.Readings.ElectricityNight)
-	return report
+	reportInTemplate := strings.Replace(template, "*показания*", report, 1)
+	return reportInTemplate
 }
 
 func getMonthName(m time.Month) string {

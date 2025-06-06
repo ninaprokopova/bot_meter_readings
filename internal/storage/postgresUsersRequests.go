@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 )
 
 func (s *PostgresStorage) Subscribe(ctx context.Context, userID int64) error {
@@ -82,4 +83,29 @@ func (s *PostgresStorage) GetShouldNotifyUsers(ctx context.Context) ([]int64, er
 	}
 
 	return users, nil
+}
+
+func (s *PostgresStorage) ChangeTemplate(ctx context.Context, userID uint64, newTemplate string) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO template (user_id, template)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id) DO UPDATE
+		SET template = $2
+	`, userID, newTemplate)
+
+	return err
+}
+
+func (s *PostgresStorage) GetTemplate(ctx context.Context, userID uint64) (template string, err error) {
+	err = s.db.QueryRowContext(ctx, `
+		SELECT template
+		FROM template
+		WHERE user_id = $1
+	`, userID).Scan(&template)
+	if err != nil {
+		log.Println(err)
+		template = "*показания*"
+		return template, err
+	}
+	return template, err
 }

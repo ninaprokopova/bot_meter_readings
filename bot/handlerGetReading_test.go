@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"fmt"
 	"submit_meter_readings/bot/mocks"
 	"testing"
 	"time"
@@ -42,13 +43,16 @@ func TestHandlerGetReading_GetMonthName(t *testing.T) {
 	}
 }
 
-func TestHandlerGetReadings_getReport(t *testing.T) {
+func TestGetReport_ReturnsCorrectlyFormattedReport(t *testing.T) {
+	t.Parallel()
+
+	const (
+		userID    = 123
+		template  = "*показания*"
+		monthYear = "май 2024"
+	)
+
 	fixedTime := time.Date(2024, time.May, 1, 0, 0, 0, 0, time.UTC)
-
-	originalNow := timeNow
-	timeNow = func() time.Time { return fixedTime }
-	defer func() { timeNow = originalNow }()
-
 	state := &UserState{
 		Readings: MeterReadings{
 			ColdWater:        1,
@@ -57,19 +61,46 @@ func TestHandlerGetReadings_getReport(t *testing.T) {
 			ElectricityNight: 4,
 		},
 	}
-	expectedReport := "Показания счетчиков май 2024:\n" +
-		"Холодная вода: 1\n" +
-		"Горячая вода: 2\n" +
-		"Электричество день (T1): 3\n" +
-		"Электричество ночь (T2): 4"
 
-	bot := &Bot{}
-	t.Run("Test_getReport", func(t *testing.T) {
-		got := bot.getReport(state)
-		if got != expectedReport {
-			t.Errorf("getReport() = \n%v\n, want \n%v", got, expectedReport)
-		}
-	})
+	expected := fmt.Sprintf(`
+Показания счетчиков %s:
+Холодная вода: %d
+Горячая вода: %d
+Электричество день (T1): %d
+Электричество ночь (T2): %d
+`,
+		monthYear,
+		state.Readings.ColdWater,
+		state.Readings.HotWater,
+		state.Readings.ElectricityDay,
+		state.Readings.ElectricityNight,
+	)
+
+	ctx := context.Background()
+	mockRepo := new(mocks.MockUserRepo)
+	mockRepo.On("GetTemplate", ctx, uint64(123)).Return("*показания*", nil)
+
+	originalNow := timeNow
+	timeNow = func() time.Time { return fixedTime }
+	t.Cleanup(func() { timeNow = originalNow })
+
+	bot := &Bot{userRepo: mockRepo}
+
+	actual := bot.getReport(ctx, state, userID)
+
+	if actual != expected {
+		t.Errorf(
+			`
+			unexpectd report format
+			got: %s
+			want: %s
+			`,
+			actual,
+			expected,
+		)
+	}
+
+	mockRepo.AssertExpectations(t)
 }
 
 func TestHandlerGetReadings_saveReadings(t *testing.T) {
@@ -121,8 +152,13 @@ func TestHandlerGetReadings_handleColdWaterInput(t *testing.T) {
 	mockSender := new(mocks.MockMessageSender)
 	expectedMsg := tgbotapi.NewMessage(testChatID, "Введите показание счетчика горячей воды:")
 	mockSender.On("SendMessage", expectedMsg).Return(nil)
+	mockRepo := new(mocks.MockUserRepo)
+	ctx := context.Background()
+	mockRepo.On("GetTemplate", ctx, uint64(123)).Return("*показания*", nil)
+
 	bot := &Bot{
-		sender: mockSender,
+		sender:   mockSender,
+		userRepo: mockRepo,
 	}
 
 	bot.handleColdWaterInput(state, testValue, testMsg)
@@ -259,7 +295,9 @@ func TestHandlerGetReadings_handleNightElectricityInputSuccess(t *testing.T) {
 		testState.Readings.ElectricityDay,
 		testValue).Return(nil)
 
-	expectedReport := bot.getReport(reportState)
+	mockRepo.On("GetTemplate", ctx, uint64(testUserID)).Return("*показания*", nil)
+
+	expectedReport := bot.getReport(ctx, reportState, uint64(testUserID))
 	expectedMsg := tgbotapi.NewMessage(testChatID, expectedReport)
 	mockSender.On("SendMessage", expectedMsg).Return(nil)
 
@@ -424,6 +462,7 @@ func TestBot_handleMeterReadingInput(t *testing.T) {
 
 		mockRepo.On("SaveMeterReadings", ctx, testUserID, 100, 80, 60, 50).Return(nil)
 		mockSender.On("SendMessage", mock.Anything).Return(nil)
+		mockRepo.On("GetTemplate", ctx, uint64(testUserID)).Return("*показания*", nil)
 
 		bot.handleMeterReadingInput(ctx, msg, state)
 

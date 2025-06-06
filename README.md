@@ -13,3 +13,5 @@ docker build -t meter-readings-bot .
 ```shell
 docker run -d --env-file .env --name meter-bot meter-readings-bot
 ```
+
+// Можно еще информация про миграции добавить, их нужно все-таки делать
